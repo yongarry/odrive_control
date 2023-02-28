@@ -20,6 +20,7 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
+            'odrive_ros_control = odrive_control.odrive_ros_control:main',
         ],
     },
 )

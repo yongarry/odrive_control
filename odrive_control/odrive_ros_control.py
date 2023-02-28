@@ -3,21 +3,23 @@ import time
 import odrive
 from odrive.enums import *
 
+import rclpy
+
 class OdriveControl:
-    def __init__(self, axis_nums):
+    def __init__(self, axis_nums, serial_number):
         self.axis_nums = axis_nums
         self.odrv_axes = []
 
         print("Looking for ODrive...")
-        self._find_odrive()
+        self._find_odrive(serial_number)
         print("Found ODrive. serial number: {}".format(self.odrv.serial_number))
         
-    def _find_odrive(self):
+    def _find_odrive(self, serial_number):
         # connect to Odrive
-        self.odrv = odrive.find_any()
+        self.odrv = odrive.find_any(serial_number=serial_number)
         
         for axis_num in range (0, self.axis_nums):
-            self.odrv_axes.append(getattr(self.odrv, "axis{}".format(axis_num)))
+            self.odrv_axes.append(getattr(self.odrv, "axis{}".format(serial_number)))
 
     def configure(self, axis_num):
         # self.odrv_axes[axis_num].requested_state = AxisState.FULL_CALIBRATION_SEQUENCE
@@ -90,17 +92,41 @@ class OdriveControl:
         self.odrv_axes[axis_num].controller.input_pos = position
 
 if __name__ == "__main__":
-    bolt_odrv = OdriveControl(axis_nums = 2)
+    rclpy.init(args=sys.argv)
+    node = rclpy.create_node('odrive_ros_control')
+    node.get_logger().info('odrive ros control node created.')
+
+    control_mode = node.declare_parameter('control_mode', 'position').value
+
+    assert isinstance(control_mode, str)
+
+    node.get_logger().warn('control mode: ' + control_mode)
+
+    # 3 Odrive Controller ( 2 * 3 = 6DOF)
+    bolt_odrv = OdriveControl(axis_nums = 2, serial_number="208039755632")
+    # bolt_odrv1 = OdriveControl(axis_nums = 2, serial_number="208039755634")
+    # bolt_odrv2 = OdriveControl(axis_nums = 2, serial_number="208039755632")
     
-    for axis_num in range(1, 2):
+    for axis_num in range(0, 2):
         bolt_odrv.configure(axis_num)
-        # time.sleep(10)
-        # bolt_odrv.mode_torque_control(axis_num)
-        bolt_odrv.mode_position_control(axis_num)
+        # bolt_odrv.configure(axis_num)
+        # bolt_odrv.configure(axis_num)
+
+    for axis_num in range(0, 2):
+        if control_mode == "position":
+            bolt_odrv.mode_position_control(axis_num)
+            # bolt_odrv1.mode_position_control(axis_num)
+            # bolt_odrv2.mode_position_control(axis_num)
+        elif control_mode == "velocity":
+            bolt_odrv.mode_velocity_control(axis_num)
+            # bolt_odrv.mode_velocity_control(axis_num)
+            # bolt_odrv.mode_velocity_control(axis_num)
+        elif control_mode == "torque":
+            bolt_odrv.mode_torque_control(axis_num)
+            # bolt_odrv.mode_torque_control(axis_num)
+            # bolt_odrv.mode_torque_control(axis_num)
+
         bolt_odrv.mode_close_loop_control(axis_num)
 
     
 
-    while(True):
-        # bolt_odrv.set_input_torque(1, 0.08)
-        bolt_odrv.set_input_pos(1, 0.5)

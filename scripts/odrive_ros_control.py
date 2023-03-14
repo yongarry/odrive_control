@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import sys
 import time
+import math
 import threading
 import odrive
 from odrive.enums import *
@@ -104,31 +105,59 @@ def joint_callback(msg):
     header = msg.header
     name = msg.name
     input_pos = msg.position
-    input_vel = msg.position
+    input_vel = msg.velocity
     input_torque = msg.effort
 
 def joint_state_transfer():
-    global pos, vel, torq, angle
+    global pos, vel, torq
+    global theta_, omega_
+    global Hz, joint_state_pub
     
+    loop_rate = rospy.Rate(Hz)
     
-    while(rospy.ok()):
-        pos = input_pos
-        vel = input_vel
-        torq = input_torque
+    encoder_data = JointState()
+
+    while not rospy.is_shutdown():
+
+        # Read Input
+        for i in range(0,6):
+            pos[i] = input_pos[i] * (4.5 / math.pi) # gear ratio 9:1
+            vel[i] = input_vel[i] * (4.5 / math.pi)
+            torq[i] = input_torque[i]
+
+        # Send Encoder data
+        encoder_data.position = theta_
+        encoder_data.velocity = omega_
+        joint_state_pub.publish(encoder_data)
+        
+
+        loop_rate.sleep()
 
 
 
 def OdriveController():
-    global bolt_odrv, control_mode, pos, vel, torq, angle
+    global bolt_odrv, control_mode, Hz
+    global pos, vel, torq
+    global theta_, omega_
 
-    while(rospy.ok()):
+    loop_rate = rospy.Rate(Hz)
+
+    pos = [0]*6
+    vel = [0]*6
+    torq = [0]*6
+
+    theta_ = [0]*6
+    omega_ = [0]*6
+
+    while not rospy.is_shutdown():
         
         # Read encoder
-        global_lock.acquire()
         for i in range(0,3):
-            angle[i] = bolt_odrv[i].odrv_axes[0].encoder.pos_estimate
-            angle[i+1] = bolt_odrv[i].odrv_axes[1].encoder.pos_estimate
-        global_lock.release()
+            theta_[i] = bolt_odrv[i].odrv_axes[0].encoder.pos_estimate * (2 * math.pi / 9)
+            theta_[i+1] = bolt_odrv[i].odrv_axes[1].encoder.pos_estimate * (2 * math.pi / 9)
+            omega_[i] = bolt_odrv[i].odrv_axes[0].encoder.vel_estimate * (2 * math.pi / 9)
+            omega_[i+1] = bolt_odrv[i].odrv_axes[1].encoder.vel_estimate * (2 * math.pi / 9)
+            
         
         # Write Input
         if control_mode == "position":
@@ -153,10 +182,17 @@ def OdriveController():
             bolt_odrv[2].set_input_torq(0,torq[4])
             bolt_odrv[2].set_input_torq(1,torq[5])
 
+        loop_rate.sleep()
+
 def main():
+    global Hz, control_mode, bolt_odrv
+    global joint_state_pub
+    global header, name, input_pos, input_vel, input_torque
+
     rospy.init_node('odrive_ros_control', anonymous=True)
     rospy.loginfo('odrive ros control node created.')
 
+    Hz = rospy.get_param('odrive_ros_control/hz', 200)
     control_mode = rospy.get_param("odrive_ros_control/control_mode", 'position')
     odrive_serial_number0 = rospy.get_param("odrive_ros_control/serial_number0", '205C39765632')
     odrive_serial_number1 = rospy.get_param("odrive_ros_control/serial_number1", '')
@@ -167,8 +203,16 @@ def main():
     rospy.loginfo('control mode: ' + control_mode)
 
     # Subscriber
-    joint_state_sub = rospy.Subscriber("joint_state", JointState, joint_callback, None, 10)
-    joint_state_pub = rospy.Publisher("encoder_value", JointState, queue_size=1)
+    header=[]
+    name=[]*6
+    input_pos=[0]*6
+    input_vel=[0]*6
+    input_torque=[0]*6
+    rospy.Subscriber("joint_set", JointState, joint_callback, None, 10)
+    
+
+    # Publisher
+    joint_state_pub = rospy.Publisher("joint_real", JointState, queue_size=5)
 
     # 3 Odrive Controller ( 2 * 3 = 6DOF)
     bolt_odrv = []
@@ -197,7 +241,17 @@ def main():
 
         bolt_odrv.mode_close_loop_control(axis_num)
 
+    threads = []
+    t1 = threading.Thread(target=OdriveController)
+    t1.start()
+    threads.append(t1)
 
+    t2 = threading.Thread(target=joint_state_transfer)
+    t2.start()
+    threads.append(t2)
+
+    for t in threads:
+        t.join()
     
 if __name__ == "__main__":
     main()

@@ -1,11 +1,13 @@
+#!/usr/bin/env python3
 import sys
 import time
 import threading
 import odrive
 from odrive.enums import *
 
-import rclpy
+import rospy
 from sensor_msgs.msg import JointState
+from std_msgs.msg import String
 
 global_lock = threading.Lock()
 
@@ -109,7 +111,7 @@ def joint_state_transfer():
     global pos, vel, torq, angle
     
     
-    while(rclpy.ok()):
+    while(rospy.ok()):
         pos = input_pos
         vel = input_vel
         torq = input_torque
@@ -119,7 +121,7 @@ def joint_state_transfer():
 def OdriveController():
     global bolt_odrv, control_mode, pos, vel, torq, angle
 
-    while(rclpy.ok()):
+    while(rospy.ok()):
         
         # Read encoder
         global_lock.acquire()
@@ -151,20 +153,19 @@ def OdriveController():
             bolt_odrv[2].set_input_torq(0,torq[4])
             bolt_odrv[2].set_input_torq(1,torq[5])
 
-def main(args=None):
-    rclpy.init(args=sys.argv)
-    node = rclpy.create_node('odrive_ros_control')
-    node.get_logger().info('odrive ros control node created.')
+def main():
+    rospy.init_node('odrive_ros_control', anonymous=True)
+    rospy.loginfo('odrive ros control node created.')
 
-    control_mode = node.declare_parameter('control_mode', 'position').value
+    control_mode = rospy.get_param('control_mode', 'position')
 
     assert isinstance(control_mode, str)
 
-    node.get_logger().warn('control mode: ' + control_mode)
+    rospy.loginfo('control mode: ' + control_mode)
 
     # Subscriber
-    joint_state_sub = node.create_subscription(JointState, "joint_state", joint_callback, 10)
-    joint_state_pub = node.create_publisher(JointState, "encoder_value", 1)
+    joint_state_sub = rospy.Subscriber("joint_state", JointState, joint_callback, None, 10)
+    joint_state_pub = rospy.Publisher("encoder_value", JointState, queue_size=1)
 
     # 3 Odrive Controller ( 2 * 3 = 6DOF)
     bolt_odrv = []

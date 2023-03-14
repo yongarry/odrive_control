@@ -1,0 +1,5 @@
+<launch>
+    <node pkg="odrive_control" name="odrive_ros_control" type="odrive_ros_control.py" output="screen">
+        <param name="control_mode" value="position"/>
+    </node>
+</launch>

@@ -157,7 +157,10 @@ def main():
     rospy.init_node('odrive_ros_control', anonymous=True)
     rospy.loginfo('odrive ros control node created.')
 
-    control_mode = rospy.get_param('control_mode', 'position')
+    control_mode = rospy.get_param("odrive_ros_control/control_mode", 'position')
+    odrive_serial_number0 = rospy.get_param("odrive_ros_control/serial_number0", '205C39765632')
+    odrive_serial_number1 = rospy.get_param("odrive_ros_control/serial_number1", '')
+    odrive_serial_number2 = rospy.get_param("odrive_ros_control/serial_number2", '')
 
     assert isinstance(control_mode, str)
 
@@ -169,9 +172,9 @@ def main():
 
     # 3 Odrive Controller ( 2 * 3 = 6DOF)
     bolt_odrv = []
-    bolt_odrv.append(OdriveControl(axis_nums = 2, serial_number="208039755632"))
-    # bolt_odrv.append(OdriveControl(axis_nums = 2, serial_number="208039755632"))
-    # bolt_odrv.append(OdriveControl(axis_nums = 2, serial_number="208039755632"))
+    bolt_odrv.append(OdriveControl(axis_nums = 2, serial_number=odrive_serial_number0))
+    # bolt_odrv.append(OdriveControl(axis_nums = 2, serial_number=odrive_serial_number1))
+    # bolt_odrv.append(OdriveControl(axis_nums = 2, serial_number=odrive_serial_number2))
     
     for axis_num in range(0, 2):
         bolt_odrv[0].configure(axis_num)

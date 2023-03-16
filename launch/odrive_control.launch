@@ -1,9 +1,11 @@
 <launch>
     <node pkg="odrive_control" name="odrive_ros_control" type="odrive_ros_control.py" output="screen">
-        <param name="control_mode" type="str" value="velocity"/>  
+        <param name="control_mode" type="str" value="position"/>  
         <!-- option for control mode: position, velocity, torque -->
-        <param name="serial_number0" value="205C39765632"/>  
+        <param name="serial_number0" type="str" value="208039755632"/>  
         <param name="serial_number1" value=""/>  
         <param name="serial_number2" value=""/>  
+    </node>
+    <node pkg="bolt_controller" name="bolt_controller" type="bolt_controller" output="screen">
     </node>
 </launch>

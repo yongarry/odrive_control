@@ -111,7 +111,7 @@ def joint_callback(msg):
 def joint_state_transfer():
     global pos, vel, torq
     global theta_, omega_
-    global Hz, joint_state_pub
+    global Hz, control_mode, joint_state_pub
     
     loop_rate = rospy.Rate(Hz)
     
@@ -121,9 +121,12 @@ def joint_state_transfer():
 
         # Read Input
         for i in range(0,6):
-            pos[i] = input_pos[i] * (4.5 / math.pi) # gear ratio 9:1
-            vel[i] = input_vel[i] * (4.5 / math.pi)
-            torq[i] = input_torque[i]
+            if control_mode == "position":
+                pos[i] = input_pos[i] * (4.5 / math.pi) # gear ratio 9:1
+            elif control_mode == "velocity":
+                vel[i] = input_vel[i] * (4.5 / math.pi)
+            elif control_mode == "torque":
+                torq[i] = input_torque[i]
 
         # Send Encoder data
         encoder_data.position = theta_
@@ -152,35 +155,35 @@ def OdriveController():
     while not rospy.is_shutdown():
         
         # Read encoder
-        for i in range(0,3):
+        for i in range(0,1):
             theta_[i] = bolt_odrv[i].odrv_axes[0].encoder.pos_estimate * (2 * math.pi / 9)
-            theta_[i+1] = bolt_odrv[i].odrv_axes[1].encoder.pos_estimate * (2 * math.pi / 9)
+            # theta_[i+1] = bolt_odrv[i].odrv_axes[1].encoder.pos_estimate * (2 * math.pi / 9)
             omega_[i] = bolt_odrv[i].odrv_axes[0].encoder.vel_estimate * (2 * math.pi / 9)
-            omega_[i+1] = bolt_odrv[i].odrv_axes[1].encoder.vel_estimate * (2 * math.pi / 9)
+            # omega_[i+1] = bolt_odrv[i].odrv_axes[1].encoder.vel_estimate * (2 * math.pi / 9)
             
         
         # Write Input
         if control_mode == "position":
             bolt_odrv[0].set_input_pos(0,pos[0])
-            bolt_odrv[0].set_input_pos(1,pos[1])
-            bolt_odrv[1].set_input_pos(0,pos[2])
-            bolt_odrv[1].set_input_pos(1,pos[3])
-            bolt_odrv[2].set_input_pos(0,pos[4])
-            bolt_odrv[2].set_input_pos(1,pos[5])
+            # bolt_odrv[0].set_input_pos(1,pos[1])
+            # bolt_odrv[1].set_input_pos(0,pos[2])
+            # bolt_odrv[1].set_input_pos(1,pos[3])
+            # bolt_odrv[2].set_input_pos(0,pos[4])
+            # bolt_odrv[2].set_input_pos(1,pos[5])
         elif control_mode == "velocity":
             bolt_odrv[0].set_input_vel(0,vel[0])
-            bolt_odrv[0].set_input_vel(1,vel[1])
-            bolt_odrv[1].set_input_vel(0,vel[2])
-            bolt_odrv[1].set_input_vel(1,vel[3])
-            bolt_odrv[2].set_input_vel(0,vel[4])
-            bolt_odrv[2].set_input_vel(1,vel[5])
+            # bolt_odrv[0].set_input_vel(1,vel[1])
+            # bolt_odrv[1].set_input_vel(0,vel[2])
+            # bolt_odrv[1].set_input_vel(1,vel[3])
+            # bolt_odrv[2].set_input_vel(0,vel[4])
+            # bolt_odrv[2].set_input_vel(1,vel[5])
         elif control_mode == "torque":
             bolt_odrv[0].set_input_torq(0,torq[0])
-            bolt_odrv[0].set_input_torq(1,torq[1])
-            bolt_odrv[1].set_input_torq(0,torq[2])
-            bolt_odrv[1].set_input_torq(1,torq[3])
-            bolt_odrv[2].set_input_torq(0,torq[4])
-            bolt_odrv[2].set_input_torq(1,torq[5])
+            # bolt_odrv[0].set_input_torq(1,torq[1])
+            # bolt_odrv[1].set_input_torq(0,torq[2])
+            # bolt_odrv[1].set_input_torq(1,torq[3])
+            # bolt_odrv[2].set_input_torq(0,torq[4])
+            # bolt_odrv[2].set_input_torq(1,torq[5])
 
         loop_rate.sleep()
 
@@ -220,7 +223,7 @@ def main():
     # bolt_odrv.append(OdriveControl(axis_nums = 2, serial_number=odrive_serial_number1))
     # bolt_odrv.append(OdriveControl(axis_nums = 2, serial_number=odrive_serial_number2))
     
-    for axis_num in range(0, 2):
+    for axis_num in range(0, 1):
         bolt_odrv[0].configure(axis_num)
         # bolt_odrv[1].configure(axis_num)
         # bolt_odrv[2].configure(axis_num)
@@ -239,7 +242,7 @@ def main():
             # bolt_odrv[1].mode_torque_control(axis_num)
             # bolt_odrv[2].mode_torque_control(axis_num)
 
-        bolt_odrv.mode_close_loop_control(axis_num)
+        bolt_odrv[0].mode_close_loop_control(axis_num)
 
     threads = []
     t1 = threading.Thread(target=OdriveController)
@@ -252,6 +255,10 @@ def main():
 
     for t in threads:
         t.join()
+
+    bolt_odrv[0].odrv.reboot()
+    return 0
     
 if __name__ == "__main__":
     main()
+    
